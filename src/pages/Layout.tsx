@@ -6,8 +6,8 @@ import Middle from "./Cupboard/Middle"; // Import Middle component
 import Right from "./Cupboard/Right"; // Import Right component
 
 const Layout: React.FC = () => {
-  const INITIAL_ROOM_WIDTH = 96;
-  const INITIAL_LAYOUT = "1";
+  const INITIAL_ROOM_WIDTH = 2400;
+  const INITIAL_LAYOUT = "11650";
   const INITIAL_COLOR = "";
 
   const [roomWidth, setRoomWidth] = useState<number>(INITIAL_ROOM_WIDTH);
@@ -16,7 +16,7 @@ const Layout: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentColorSet, setCurrentColorSet] = useState<"lam" | "pu">("lam");
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [layoutPosition, setLayoutPosition] = useState<string | null>("middle");
+  const [layoutPosition, setLayoutPosition] = useState<string | null>("left");
 
   const handleRoomWidthChange = (width: number) => {
     setRoomWidth(width);
@@ -72,7 +72,7 @@ const Layout: React.FC = () => {
     <div className="space-y-4">
       <h3 className="text-xl font-semibold mb-3">Select Room Width</h3>
       <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 flex flex-wrap gap-4">
-        {[96, 120, 144].map((width) => (
+        {[2400, 3000, 3600].map((width) => (
           <button
             key={width}
             onClick={() => handleRoomWidthChange(width)}
@@ -82,7 +82,7 @@ const Layout: React.FC = () => {
                 : "bg-gray-200 text-gray-800"
             } hover:bg-blue-600`}
           >
-            {width / 12} ft
+            {width / 300} ft
           </button>
         ))}
       </div>
@@ -168,7 +168,7 @@ const Layout: React.FC = () => {
         <BabylonScene
           roomWidth={roomWidth}
           layout={layout}
-          height={100}
+          height={3000}
           colorTexture={selectedColor}
         />
       </div>

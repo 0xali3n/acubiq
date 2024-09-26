@@ -3,18 +3,18 @@ import {
   Engine,
   Scene,
   ArcRotateCamera,
+  HemisphericLight,
+  Vector3,
   Color4,
+  MeshBuilder,
+  SceneLoader,
   AbstractMesh,
+  StandardMaterial,
   Texture,
   Color3,
-  PBRMaterial,
-  StandardMaterial,
-  Vector3,
+  PointLight,
 } from "@babylonjs/core";
 import "@babylonjs/loaders";
-import createRoom from "./Room";
-import addLighting from "./Lighting";
-import loadModel from "./ModelLoader";
 
 interface BabylonSceneProps {
   roomWidth: number;
@@ -32,6 +32,8 @@ const BabylonScene: React.FC<BabylonSceneProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [scene, setScene] = useState<Scene | null>(null);
   const [currentModel, setCurrentModel] = useState<AbstractMesh | null>(null);
+  const [modelFilename, setModelFilename] = useState(layout);
+  const [isOpen, setIsOpen] = useState(true); // State to track if the door is open
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -41,7 +43,6 @@ const BabylonScene: React.FC<BabylonSceneProps> = ({
 
       newScene.clearColor = new Color4(0.9, 0.9, 0.9, 1.0);
 
-      // Set up camera
       const camera = new ArcRotateCamera(
         "camera",
         Math.PI / 2,
@@ -51,18 +52,30 @@ const BabylonScene: React.FC<BabylonSceneProps> = ({
         newScene
       );
       camera.attachControl(canvas, true);
+
       camera.lowerAlphaLimit = -Math.PI;
       camera.upperAlphaLimit = Math.PI;
       camera.lowerBetaLimit = Math.PI / 4;
       camera.upperBetaLimit = Math.PI / 2;
       camera.lowerRadiusLimit = Math.max(roomWidth, height) / 2;
-      camera.upperRadiusLimit = Math.max(roomWidth, height) * 3;
+      camera.upperRadiusLimit = Math.max(roomWidth, height) * 2;
+      camera.wheelDeltaPercentage = 0.05;
 
-      // Add lighting
-      addLighting(newScene);
+      const hemisphericLight = new HemisphericLight(
+        "hemisphericLight",
+        new Vector3(0, 1, 0),
+        newScene
+      );
+      hemisphericLight.intensity = 0.8;
 
-      // Create room
-      createRoom(newScene, roomWidth, height);
+      const pointLight = new PointLight(
+        "pointLight",
+        new Vector3(10, 10, 10),
+        newScene
+      );
+      pointLight.intensity = 0.6;
+
+      createRoom(newScene);
 
       engine.runRenderLoop(() => {
         newScene.render();
@@ -73,7 +86,6 @@ const BabylonScene: React.FC<BabylonSceneProps> = ({
       };
 
       window.addEventListener("resize", handleResize);
-
       setScene(newScene);
 
       return () => {
@@ -90,37 +102,113 @@ const BabylonScene: React.FC<BabylonSceneProps> = ({
         currentModel.dispose();
       }
 
-      loadModel(scene, layout, setCurrentModel);
-    }
-  }, [scene, layout]);
-
-  useEffect(() => {
-    if (scene && currentModel && colorTexture) {
-      const newTexture = new Texture(colorTexture, scene);
-
-      currentModel.getChildMeshes().forEach((mesh) => {
-        if (mesh.material) {
-          if (mesh.material instanceof StandardMaterial) {
-            const stdMaterial = mesh.material as StandardMaterial;
-            stdMaterial.diffuseTexture = newTexture.clone();
-            stdMaterial.diffuseTexture.hasAlpha = true;
-            stdMaterial.useAlphaFromDiffuseTexture = true;
-            stdMaterial.specularColor = new Color3(0, 0, 0);
-            stdMaterial.emissiveColor = new Color3(1, 1, 1);
-          } else if (mesh.material instanceof PBRMaterial) {
-            const pbrMaterial = mesh.material as PBRMaterial;
-            pbrMaterial.albedoTexture = newTexture.clone();
-            pbrMaterial.albedoTexture.hasAlpha = true;
-            pbrMaterial.useAlphaFromAlbedoTexture = true;
-            pbrMaterial.metallic = 0;
-            pbrMaterial.roughness = 1;
+      SceneLoader.ImportMesh(
+        "",
+        "/models/",
+        `${modelFilename}.glb`,
+        scene,
+        (meshes) => {
+          if (meshes.length > 0) {
+            const model = meshes[0] as AbstractMesh;
+            model.position = new Vector3(900, 0, -300);
+            setCurrentModel(model);
+            console.log(modelFilename);
           }
+        },
+        null,
+        (_scene, message) => {
+          console.error("Error loading model:", message);
         }
-      });
+      );
     }
-  }, [scene, currentModel, colorTexture]);
+  }, [scene, modelFilename]);
 
-  return <canvas ref={canvasRef} className="w-full h-full" />;
+  const createRoom = (scene: Scene) => {
+    const roomDepth = 2000;
+
+    const floorMat = new StandardMaterial("floorMat", scene);
+    floorMat.diffuseTexture = new Texture(
+      "https://www.babylonjs-playground.com/textures/wood.jpg",
+      scene
+    );
+    const floor = MeshBuilder.CreateGround(
+      "floor",
+      { width: roomWidth, height: roomDepth },
+      scene
+    );
+    floor.material = floorMat;
+    floor.position.y = -0.1;
+
+    const wallMatLight = new StandardMaterial("wallMatLight", scene);
+    wallMatLight.diffuseColor = new Color3(1.0, 1.0, 1.0);
+
+    const wallParams = [
+      {
+        name: "backWall",
+        width: roomWidth,
+        height: height,
+        position: new Vector3(0, height / 2, -roomDepth / 2),
+        rotation: Math.PI,
+      },
+      {
+        name: "frontWall",
+        width: roomWidth,
+        height: height,
+        position: new Vector3(0, height / 2, roomDepth / 2),
+        rotation: 0,
+      },
+      {
+        name: "leftWall",
+        width: roomDepth,
+        height: height,
+        position: new Vector3(-roomWidth / 2, height / 2, 0),
+        rotation: -Math.PI / 2,
+      },
+      {
+        name: "rightWall",
+        width: roomDepth,
+        height: height,
+        position: new Vector3(roomWidth / 2, height / 2, 0),
+        rotation: Math.PI / 2,
+      },
+    ];
+
+    wallParams.forEach(({ name, width, height, position, rotation }) => {
+      const wall = MeshBuilder.CreatePlane(name, { width, height }, scene);
+      wall.material = wallMatLight;
+      wall.position = position;
+      wall.rotation.y = rotation;
+    });
+  };
+
+  const handleToggleDoor = () => {
+    if (isOpen) {
+      // If currently open, close the door
+      const newFilename = (parseInt(modelFilename) + 10000).toString();
+      setModelFilename(newFilename);
+      console.log(newFilename);
+    } else {
+      // If currently closed, open the door
+      setModelFilename(layout);
+      console.log(layout);
+    }
+
+    setIsOpen(!isOpen); // Toggle the state
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <canvas ref={canvasRef} className="w-full h-full" />
+      <div className="absolute top-4 right-4 flex">
+        <button
+          className="px-3 py-1 text-white font-bold rounded-lg bg-green-500 hover:bg-green-600 shadow-lg transition-transform duration-300 ease-in-out transform hover:scale-105"
+          onClick={handleToggleDoor}
+        >
+          {isOpen ? "Close Door" : "Open Door"}
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default BabylonScene;
